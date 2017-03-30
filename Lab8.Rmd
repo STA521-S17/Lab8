@@ -39,9 +39,9 @@ rr.model = function() {
       prec.beta[j] <- lambda.beta*phi
       beta.s[j] ~ dnorm(0, prec.beta[j])
   }
-# Cauchy Prior on beta
+# Induce Cauchy Prior on beta
   lambda.beta ~ dgamma(.5, .5)
-
+#   lambda.beta = 3.06
   for (j in 1:p) {
       beta[j] <- beta.s[j]/scales[j]   # rescale
   }
@@ -75,13 +75,16 @@ data(College)
 X = model.matrix(sqrt(Apps) ~ ., data=College)
 X = X[,-1]  # drop intercept
 
-# Create a data list with inputs for WinBugs
-scaled.X = scale(X)
+# Create a data list with inputs for JAGS
+scales = apply(X, 2, FUN=function(x) {
+  sd(x)*sqrt(length(x) - 1)})
+Xbar = apply(X, 2, mean)
+scaled.X = scale(X, center=Xbar, scale = scales)
 data = list(Y = sqrt(College$Apps),   # variance stabilizing transformation
-            X=cbind(scaled.X), p=ncol(X))
+            X=scaled.X, p=ncol(X))
 data$n = length(data$Y)
-data$scales = c(1, attr(scaled.X, "scaled:scale"))
-data$Xbar = attr(scaled.X, "scaled:center")
+data$scales = scales
+data$Xbar = Xbar
 
 ```
 
@@ -91,7 +94,7 @@ data$Xbar = attr(scaled.X, "scaled:center")
 we can save any of the stochastic or deterministic nodes
 
 ```{r}
-parameters = c("beta.s", "beta", "beta0", "lambda.beta", "sigma")
+parameters = c("alpha0","beta.s", "beta", "beta0", "lambda.beta", "sigma")
 ```
 
 ## Running JAGS
@@ -147,7 +150,7 @@ beta.s = bayes.rr[grep("beta.s", rownames(bayes.rr)), "mean" ]
 beta = bayes.rr[grep("beta\\[", rownames(bayes.rr)), "mean" ]
 
 
-plot(best.rr$coef, beta.s, xlab="Ridge Regression", ylab="Bayes Posterior Mean (scaled)")
+plot(coef(best.rr)[-1], beta, xlab="Ridge Regression", ylab="Bayes Posterior Mean (scaled)")
 abline(0,1)
 ```
 
